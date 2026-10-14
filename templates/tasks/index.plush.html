@@ -3,6 +3,7 @@
   <p class="list-count">
     <%= len(tasks) %> <%= if (len(tasks) == 1) { %>tarea en tu lista<% } else { %>tareas en tu lista<% } %>
   </p>
+  <p class="list-count" data-pending-count role="status"><%= if (pendingCount == 0) { %>No hay tareas pendientes<% } else if (pendingCount == 1) { %>1 tarea pendiente<% } else { %><%= pendingCount %> tareas pendientes<% } %></p>
 </header>
 
 <section aria-labelledby="list-heading">

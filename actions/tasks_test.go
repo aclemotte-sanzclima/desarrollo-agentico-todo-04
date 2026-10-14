@@ -237,3 +237,83 @@ func (as *ActionSuite) Test_TasksUpdate_InvalidID() {
 	res := as.HTML("/tasks/no-es-un-uuid").Put(url.Values{"title": {"Título nuevo"}})
 	as.Equal(404, res.Code)
 }
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_Empty() {
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "No hay tareas pendientes")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_Plural() {
+	as.LoadFixture("tres tareas")
+
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "2 tareas pendientes")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_Singular() {
+	as.NoError(as.DB.Create(&models.Task{Title: "Única pendiente"}))
+
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	body := res.Body.String()
+	as.Contains(body, "1 tarea pendiente")
+	as.NotContains(body, "tareas pendientes")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_AllCompleted() {
+	as.NoError(as.DB.Create(&models.Task{Title: "Ya hecha", Completed: true}))
+
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "No hay tareas pendientes")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_AfterToggle() {
+	task := &models.Task{Title: "Para alternar"}
+	as.NoError(as.DB.Create(task))
+
+	res := as.HTML("/tasks/%s/toggle", task.ID).Put(url.Values{})
+	as.Equal(303, res.Code)
+	res = as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "No hay tareas pendientes")
+
+	res = as.HTML("/tasks/%s/toggle", task.ID).Put(url.Values{})
+	as.Equal(303, res.Code)
+	res = as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "1 tarea pendiente")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_AfterDestroy() {
+	as.LoadFixture("tres tareas")
+
+	task := &models.Task{}
+	as.NoError(as.DB.Where("completed = ?", false).First(task))
+
+	res := as.HTML("/tasks/%s", task.ID).Delete()
+	as.Equal(303, res.Code)
+
+	res = as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "1 tarea pendiente")
+}
+
+func (as *ActionSuite) Test_TasksIndex_PendingCount_AfterCreate() {
+	res := as.HTML("/tasks").Post(&models.Task{Title: "Recién creada"})
+	as.Equal(303, res.Code)
+
+	res = as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), "1 tarea pendiente")
+}
+
+func (as *ActionSuite) Test_TasksCreate_Invalid_ShowsPendingCount() {
+	as.LoadFixture("tres tareas")
+
+	res := as.HTML("/tasks").Post(&models.Task{Title: ""})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "2 tareas pendientes")
+}
